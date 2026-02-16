@@ -20,7 +20,7 @@
         }
         th:hover { background-color: #3730a3; }
         
-        /* Kontener dla tekstu nagłówka i ikony */
+   
         .th-content {
             display: flex;
             align-items: center;
@@ -28,7 +28,7 @@
             gap: 8px;
         }
 
-        /* Styl ikony strzałki */
+ 
         .sort-icon {
             width: 12px;
             height: 12px;
@@ -37,12 +37,12 @@
             transition: transform 0.3s ease, opacity 0.3s ease;
         }
 
-        /* Pokazujemy ikonę gdy kolumna jest aktywna */
+ 
         th.active-sort .sort-icon {
             opacity: 1;
         }
 
-        /* Obrót dla sortowania malejącego */
+ 
         th.sort-desc .sort-icon {
             transform: rotate(180deg);
         }
@@ -100,7 +100,7 @@
 let currentSortCol = -1;
 let sortAsc = true;
 
-// Ikona strzałki w formacie SVG
+
 const arrowSvg = `<svg class="sort-icon" viewBox="0 0 24 24"><path d="M7 14l5-5 5 5H7z"/></svg>`;
 
 function getRawValue(text) {
@@ -135,7 +135,7 @@ function sortTable(colIndex) {
     
     currentSortCol = colIndex;
     
-    // Aktualizacja klas CSS dla animacji
+ 
     ths.forEach(th => th.classList.remove('active-sort', 'sort-desc'));
     ths[colIndex].classList.add('active-sort');
     if (!sortAsc) {
@@ -207,7 +207,7 @@ function processData() {
                     else if (cleanVal.match(/^\d{1,2}\.\d{1,2}\.\d{4}$/)) cleanVal = formatDatePolish(cleanVal);
                     el.innerText = cleanVal;
                 } else {
-                    // Dla nagłówków tworzymy strukturę z ikoną
+                
                     el.innerHTML = `<div class="th-content"><span>${cleanVal}</span>${arrowSvg}</div>`;
                     el.onclick = () => sortTable(cellIndex);
                 }
@@ -218,7 +218,7 @@ function processData() {
         });
         document.getElementById("previewArea").classList.remove("hidden");
         document.getElementById("searchContainer").classList.remove("hidden");
-        document.getElementById("status").innerText = "✅ Wczytano dane.";
+        document.getElementById("status").innerText = "Wczytano dane.";
     };
     reader.readAsText(input.files[0]);
 }
@@ -232,4 +232,5 @@ function filterTable() {
 }
 </script>
 </body>
+
 </html>
