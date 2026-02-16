@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Konwerter godzin pracy RealmRP</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #374151; padding: 12px; text-align: left; white-space: nowrap; }
+        th { 
+            background-color: #312e81; 
+            color: white; 
+            position: sticky; 
+            top: 0; 
+            z-index: 10; 
+            font-weight: bold; 
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.2s;
+        }
+        th:hover { background-color: #3730a3; }
+        
+        /* Kontener dla tekstu nagłówka i ikony */
+        .th-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        /* Styl ikony strzałki */
+        .sort-icon {
+            width: 12px;
+            height: 12px;
+            fill: currentColor;
+            opacity: 0;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+
+        /* Pokazujemy ikonę gdy kolumna jest aktywna */
+        th.active-sort .sort-icon {
+            opacity: 1;
+        }
+
+        /* Obrót dla sortowania malejącego */
+        th.sort-desc .sort-icon {
+            transform: rotate(180deg);
+        }
+
+        tr:nth-child(even) { background-color: #1f2937; }
+        tr:hover { background-color: #4b5563; transition: 0.2s; }
+        .scroll-custom::-webkit-scrollbar { width: 8px; height: 8px; }
+        .scroll-custom::-webkit-scrollbar-track { background: #1f2937; }
+        .scroll-custom::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        .hidden-row { display: none; }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen p-6">
+
+<div class="max-w-6xl mx-auto">
+    <div class="bg-gray-800 shadow-2xl rounded-2xl p-8 border border-gray-700 mb-6 text-center">
+        <h1 class="text-3xl font-bold text-indigo-400 mb-4">Konwerter godzin pracowników</h1>
+        
+        <div class="flex flex-col items-center gap-4">
+            <input id="fileInput" type="file" accept=".csv" 
+                class="block w-full max-w-md text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 cursor-pointer border border-gray-600 rounded-lg"/>
+            
+            <button onclick="processData()" 
+                class="w-full max-w-md py-3 bg-indigo-600 hover:bg-indigo-500 transition rounded-xl font-bold text-lg shadow-lg">
+                Wyświetl Tabelę
+            </button>
+            <p id="status" class="font-medium"></p>
+        </div>
+    </div>
+
+    <div id="searchContainer" class="hidden mb-4">
+        <div class="relative max-w-md mx-auto">
+            <span class="absolute inset-y-0 left-0 flex items-center pl-3">
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+            </span>
+            <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Wyszukaj pracownika..." 
+                class="block w-full py-3 pl-10 pr-3 bg-gray-800 border border-gray-600 rounded-xl leading-5 text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
+        </div>
+    </div>
+
+    <div id="previewArea" class="hidden animate-fade-in">
+        <p class="text-xs text-gray-500 mb-2 italic">* Kliknij nagłówek kolumny, aby posortować</p>
+        <div class="overflow-x-auto bg-gray-800 rounded-xl border border-gray-700 shadow-xl max-h-[700px] overflow-y-auto scroll-custom">
+            <table id="resultTable">
+                <thead id="tableHead"></thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentSortCol = -1;
+let sortAsc = true;
+
+// Ikona strzałki w formacie SVG
+const arrowSvg = `<svg class="sort-icon" viewBox="0 0 24 24"><path d="M7 14l5-5 5 5H7z"/></svg>`;
+
+function getRawValue(text) {
+    if (text.includes('godzin')) {
+        const parts = text.match(/\d+/g);
+        return parts ? parseInt(parts[0]) * 60 + parseInt(parts[1]) : 0;
+    }
+    const months = ["stycznia", "lutego", "marca", "kwietnia", "maja", "czerwca", "lipca", "sierpnia", "września", "października", "listopada", "grudnia"];
+    for (let i = 0; i < months.length; i++) {
+        if (text.includes(months[i])) {
+            const parts = text.split(' ');
+            return new Date(parts[2], i, parts[0]).getTime();
+        }
+    }
+    if (!isNaN(text) && text !== "") return parseFloat(text);
+    return text.toLowerCase();
+}
+
+function sortTable(colIndex) {
+    const tableBody = document.getElementById("tableBody");
+    const rows = Array.from(tableBody.querySelectorAll("tr"));
+    const ths = document.querySelectorAll("#tableHead th");
+
+    if (currentSortCol === colIndex) {
+        sortAsc = !sortAsc;
+    } else {
+        sortAsc = true;
+        if (currentSortCol !== -1) {
+            ths[currentSortCol].classList.remove('active-sort', 'sort-desc');
+        }
+    }
+    
+    currentSortCol = colIndex;
+    
+    // Aktualizacja klas CSS dla animacji
+    ths.forEach(th => th.classList.remove('active-sort', 'sort-desc'));
+    ths[colIndex].classList.add('active-sort');
+    if (!sortAsc) {
+        ths[colIndex].classList.add('sort-desc');
+    }
+
+    rows.sort((a, b) => {
+        const valA = getRawValue(a.cells[colIndex].innerText);
+        const valB = getRawValue(b.cells[colIndex].innerText);
+        if (valA < valB) return sortAsc ? -1 : 1;
+        if (valA > valB) return sortAsc ? 1 : -1;
+        return 0;
+    });
+
+    rows.forEach(row => tableBody.appendChild(row));
+}
+
+function formatWorkHours(val) {
+    if (val.includes(':')) {
+        const parts = val.split(':');
+        return parts.length >= 2 ? `${parseInt(parts[0])} godzin ${parseInt(parts[1])} minut` : val;
+    }
+    return val;
+}
+
+function formatDatePolish(val) {
+    const months = ["stycznia", "lutego", "marca", "kwietnia", "maja", "czerwca", "lipca", "sierpnia", "września", "października", "listopada", "grudnia"];
+    const dateParts = val.split('.');
+    if (dateParts.length === 3) {
+        const monthIndex = parseInt(dateParts[1]) - 1;
+        return (monthIndex >= 0 && monthIndex < 12) ? `${parseInt(dateParts[0])} ${months[monthIndex]} ${dateParts[2]}` : val;
+    }
+    return val;
+}
+
+function parseCSVLine(text) {
+    const result = [];
+    let curVal = "", inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+        let char = text[i];
+        if (char === '"') inQuotes = !inQuotes;
+        else if (char === ',' && !inQuotes) { result.push(curVal.trim()); curVal = ""; }
+        else curVal += char;
+    }
+    result.push(curVal.trim());
+    return result;
+}
+
+function processData() {
+    const input = document.getElementById("fileInput");
+    const tableHead = document.getElementById("tableHead");
+    const tableBody = document.getElementById("tableBody");
+    if (!input.files.length) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const lines = e.target.result.split(/\r?\n/).filter(l => l.trim() !== "");
+        tableHead.innerHTML = ""; tableBody.innerHTML = "";
+        currentSortCol = -1;
+
+        lines.forEach((line, index) => {
+            const cells = parseCSVLine(line);
+            const tr = document.createElement("tr");
+            cells.forEach((cell, cellIndex) => {
+                const el = document.createElement(index === 0 ? "th" : "td");
+                let cleanVal = cell.replace(/^"|"$/g, '');
+                if (index > 0) {
+                    if (cleanVal.includes(':')) cleanVal = formatWorkHours(cleanVal);
+                    else if (cleanVal.match(/^\d{1,2}\.\d{1,2}\.\d{4}$/)) cleanVal = formatDatePolish(cleanVal);
+                    el.innerText = cleanVal;
+                } else {
+                    // Dla nagłówków tworzymy strukturę z ikoną
+                    el.innerHTML = `<div class="th-content"><span>${cleanVal}</span>${arrowSvg}</div>`;
+                    el.onclick = () => sortTable(cellIndex);
+                }
+                tr.appendChild(el);
+            });
+            if (index === 0) tableHead.appendChild(tr);
+            else tableBody.appendChild(tr);
+        });
+        document.getElementById("previewArea").classList.remove("hidden");
+        document.getElementById("searchContainer").classList.remove("hidden");
+        document.getElementById("status").innerText = "✅ Wczytano dane.";
+    };
+    reader.readAsText(input.files[0]);
+}
+
+function filterTable() {
+    const filter = document.getElementById("searchInput").value.toUpperCase();
+    const rows = document.getElementById("tableBody").getElementsByTagName("tr");
+    for (let row of rows) {
+        row.classList.toggle("hidden-row", row.textContent.toUpperCase().indexOf(filter) === -1);
+    }
+}
+</script>
+</body>
+</html>
