@@ -109,7 +109,7 @@ document.getElementById('fileInput').addEventListener('change', function(e) {
 
         const grid = document.getElementById("ratesGrid");
         grid.innerHTML = "";
-        Array.from(uniqueJobs).sort().forEach(job => {
+      Array.from(uniqueJobs).sort().forEach(job => {
             if (!(job in jobRates)) jobRates[job] = 0;
             const div = document.createElement("div");
             div.className = "bg-gray-900/50 p-3 rounded-lg border border-gray-700 hover:border-indigo-500 transition-all";
@@ -117,7 +117,11 @@ document.getElementById('fileInput').addEventListener('change', function(e) {
                 <label class="block text-xs font-black text-indigo-400 uppercase mb-1">${job}</label>
                 <div class="flex items-center gap-2">
                     <span class="text-green-500 font-bold">$</span>
-                    <input type="number" step="0.01" value="${jobRates[job]}" oninput="updateRate('${job}', this.value)" 
+                    <input type="number" 
+                        step="100" 
+                        value="${jobRates[job]}" 
+                        oninput="updateRate('${job}', this.value)" 
+                        onwheel="this.blur()"
                         class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-green-400 font-mono focus:ring-1 focus:ring-indigo-500 outline-none">
                     <span class="text-gray-500 text-sm">/h</span>
                 </div>
@@ -200,15 +204,16 @@ function renderTable() {
     let timeColIndex = headers.findIndex(h => h.toLowerCase().includes("godziny"));
     if (timeColIndex === -1) timeColIndex = 4;
 
+    let grandTotal = 0;
     csvData.forEach(item => {
         const rate = jobRates[item.raw[jobColIndex]?.trim()] || 0;
         item.salary = calculateSalary(item.raw[timeColIndex], rate);
+        grandTotal += item.salary; 
     });
 
     let filteredData = csvData.filter(item => {
         return item.raw.some(cell => cell.toLowerCase().includes(searchQuery));
     });
-
 
     if (sortConfig.column !== null) {
         filteredData.sort((a, b) => {
@@ -236,17 +241,13 @@ function renderTable() {
         });
     }
 
-
     tableHead.innerHTML = `<tr>${[...headers, "Wypłata"].map((h, i) => {
         let cls = i === sortConfig.column ? (sortConfig.direction === 'asc' ? 'sort-asc' : 'sort-desc') : '';
         return `<th class="${cls}" onclick="sortTable(${i})">${h}</th>`;
     }).join('')}</tr>`;
 
-
-    let visibleTotal = 0;
     tableBody.innerHTML = "";
     filteredData.forEach(item => {
-        visibleTotal += item.salary;
         const tr = document.createElement("tr");
         item.raw.forEach(cell => {
             const td = document.createElement("td");
@@ -255,12 +256,18 @@ function renderTable() {
         });
         const tdSalary = document.createElement("td");
         tdSalary.className = "font-bold text-green-400 font-mono";
-        tdSalary.innerText = "$" + item.salary.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+     
+        tdSalary.innerText = "$" + item.salary.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         tr.appendChild(tdSalary);
         tableBody.appendChild(tr);
     });
 
-    totalDisplay.innerText = "$" + visibleTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    totalDisplay.innerText = "$" + grandTotal.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    if (searchQuery !== "") {
+        totalDisplay.innerHTML += ` <span class="text-sm text-gray-400 block font-normal">(Suma wszystkich osób)</span>`;
+    }
 }
 
 function parseCSVLine(text) {
